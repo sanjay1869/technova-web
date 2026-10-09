@@ -1,0 +1,16 @@
+# =============================================================
+# appspec.yaml - tells AWS CodeDeploy how to deploy to ECS (Part B)
+# -------------------------------------------------------------
+# <TASK_DEFINITION> is a placeholder. The CodePipeline
+# "Amazon ECS (Blue/Green)" action replaces it with the ARN of the
+# new task definition revision it registers from taskdef.json.
+# =============================================================
+version: 0.0
+Resources:
+  - TargetService:
+      Type: AWS::ECS::Service
+      Properties:
+        TaskDefinition: <TASK_DEFINITION>
+        LoadBalancerInfo:
+          ContainerName: "technova-web"   # same name as in taskdef.json
+          ContainerPort: 8080             # port the container listens on

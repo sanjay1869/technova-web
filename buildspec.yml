@@ -1,0 +1,100 @@
+# =============================================================
+# buildspec.yml - instructions for AWS CodeBuild   (version 2.0)
+# -------------------------------------------------------------
+# CodeBuild reads this file from the root of the repository.
+# Flow: install Node.js -> install dependencies -> run tests ->
+#       check Docker -> log in to ECR -> build image -> push image ->
+#       write the files that the Deploy stage needs.
+#
+# Every check prints "ERROR - ..." and "FIX - ..." in the build log,
+# so a beginner can see exactly what to correct.
+# =============================================================
+version: 0.2
+
+env:
+  variables:
+    REPOSITORY_NAME: "technova-web"   # Amazon ECR repository name (Step 4)
+    CONTAINER_NAME: "technova-web"    # Must match the container name in the task definition
+
+phases:
+  install:
+    on-failure: ABORT
+    runtime-versions:
+      nodejs: 22                      # Node.js 22 (included in amazonlinux-x86_64-standard:5.0)
+    commands:
+      - echo "Node.js $(node --version) / npm $(npm --version)"
+
+  pre_build:
+    on-failure: ABORT                 # Any failure here stops the build: nothing is pushed
+    commands:
+      - echo "=== 1/6 Install dependencies and run the unit tests ==="
+      - npm ci
+      - mkdir -p reports
+      - npm run test:ci
+      - echo "=== 2/6 Check that Docker is available ==="
+      - |
+        if ! docker info > /dev/null 2>&1; then
+          echo "ERROR - Docker is not available in this build."
+          echo "FIX   - CodeBuild > Build projects > technova-web-build > Edit > Environment >"
+          echo "        Additional configuration > tick Privileged > Update project. Then retry."
+          exit 1
+        fi
+      - echo "=== 3/6 Work out the image name and tag ==="
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+      - REPOSITORY_URI="${REGISTRY}/${REPOSITORY_NAME}"
+      # CODEBUILD_RESOLVED_SOURCE_VERSION holds the Git commit ID. Keep letters and digits only.
+      - COMMIT_SHORT=$(echo "${CODEBUILD_RESOLVED_SOURCE_VERSION}" | tr -cd 'a-zA-Z0-9' | cut -c 1-7)
+      - if [ -z "$COMMIT_SHORT" ]; then COMMIT_SHORT="manual"; fi
+      # Tag = commit + build number, e.g. a1b2c3d-12. Every build gets a NEW tag,
+      # so the immutable ECR repository never rejects a push.
+      - IMAGE_TAG="${COMMIT_SHORT}-${CODEBUILD_BUILD_NUMBER}"
+      - IMAGE_URI="${REPOSITORY_URI}:${IMAGE_TAG}"
+      - echo "Image will be ${IMAGE_URI}"
+      - echo "=== 4/6 Check the ECR repository and log in ==="
+      - |
+        if ! aws ecr describe-repositories --repository-names "$REPOSITORY_NAME" > /dev/null; then
+          echo "ERROR - CodeBuild cannot read the ECR repository $REPOSITORY_NAME in $AWS_DEFAULT_REGION."
+          echo "FIX   - Check the repository exists in this Region (Step 4) and that the CodeBuild role"
+          echo "        has the policy AmazonEC2ContainerRegistryPowerUser attached (Step 6.4). Then retry."
+          exit 1
+        fi
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+
+  build:
+    on-failure: ABORT
+    commands:
+      - echo "=== 5/6 Build the Docker image ==="
+      - docker build --build-arg BUILD_NUMBER="$CODEBUILD_BUILD_NUMBER" --build-arg GIT_COMMIT="$COMMIT_SHORT" -t "$IMAGE_URI" .
+
+  post_build:
+    commands:
+      # post_build runs even if an earlier phase failed, so check first
+      - if [ "$CODEBUILD_BUILD_SUCCEEDING" != "1" ]; then echo "Build failed - nothing will be pushed"; exit 1; fi
+      - echo "=== 6/6 Push the image and write the deployment files ==="
+      - docker push "$IMAGE_URI"
+      # Rolling update (Part A): container name + image URI
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$CONTAINER_NAME" "$IMAGE_URI" > imagedefinitions.json
+      # Blue/green (Part B): image URI for CodeDeploy
+      - printf '{"ImageURI":"%s"}' "$IMAGE_URI" > imageDetail.json
+      # Blue/green (Part B): task definition with your account and Region filled in
+      - sed -e "s|__ACCOUNT_ID__|${AWS_ACCOUNT_ID}|g" -e "s|__AWS_REGION__|${AWS_DEFAULT_REGION}|g" deploy/taskdef.template.json > taskdef.json
+      - cp deploy/appspec.yaml appspec.yaml
+      - echo "Pushed image - copy this URI for Step 11 -> ${IMAGE_URI}"
+      - cat imagedefinitions.json && echo
+
+# Unit test results appear under CodeBuild > Report groups
+reports:
+  technova-unit-tests:
+    files:
+      - "junit.xml"
+    base-directory: "reports"
+    file-format: "JUNITXML"
+
+# Files handed to the Deploy stage (the "BuildArtifact")
+artifacts:
+  files:
+    - imagedefinitions.json
+    - imageDetail.json
+    - taskdef.json
+    - appspec.yaml

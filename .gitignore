@@ -1,0 +1,7 @@
+# Files Git should NOT track
+node_modules/
+reports/
+npm-debug.log*
+.env
+.DS_Store
+Thumbs.db

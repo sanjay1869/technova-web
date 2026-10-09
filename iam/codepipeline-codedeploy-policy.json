@@ -1,0 +1,53 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowCodeDeployDeploymentActions",
+      "Effect": "Allow",
+      "Action": [
+        "codedeploy:CreateDeployment",
+        "codedeploy:GetDeployment"
+      ],
+      "Resource": "arn:aws:codedeploy:*:*:deploymentgroup:technova-web-app/*"
+    },
+    {
+      "Sid": "AllowCodeDeployApplicationActions",
+      "Effect": "Allow",
+      "Action": [
+        "codedeploy:GetApplication",
+        "codedeploy:GetApplicationRevision",
+        "codedeploy:RegisterApplicationRevision"
+      ],
+      "Resource": [
+        "arn:aws:codedeploy:*:*:application:technova-web-app",
+        "arn:aws:codedeploy:*:*:application:technova-web-app/*"
+      ]
+    },
+    {
+      "Sid": "AllowCodeDeployDeploymentConfigAccess",
+      "Effect": "Allow",
+      "Action": "codedeploy:GetDeploymentConfig",
+      "Resource": "arn:aws:codedeploy:*:*:deploymentconfig:*"
+    },
+    {
+      "Sid": "AllowECSRegisterTaskDefinition",
+      "Effect": "Allow",
+      "Action": "ecs:RegisterTaskDefinition",
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowPassRoleToECS",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/ecsTaskExecutionRole",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": [
+            "ecs.amazonaws.com",
+            "ecs-tasks.amazonaws.com"
+          ]
+        }
+      }
+    }
+  ]
+}

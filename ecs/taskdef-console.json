@@ -1,0 +1,44 @@
+{
+  "family": "technova-web",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "PASTE-HERE-the-ARN-of-ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "technova-web",
+      "image": "PASTE-HERE-the-image-URI-copied-from-ECR",
+      "essential": true,
+      "portMappings": [
+        {
+          "name": "technova-web-8080-tcp",
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp",
+          "appProtocol": "http"
+        }
+      ],
+      "environment": [
+        {
+          "name": "APP_ENV",
+          "value": "production"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/technova-web",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

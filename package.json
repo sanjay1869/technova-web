@@ -1,0 +1,19 @@
+{
+  "name": "technova-web",
+  "version": "1.0.0",
+  "description": "TechNova Store demo web app for the AWS CI/CD pipeline to Amazon ECS lab",
+  "main": "src/server.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "test:ci": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/junit.xml"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "license": "MIT"
+}

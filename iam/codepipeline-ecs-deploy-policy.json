@@ -1,0 +1,48 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "TaskDefinitionPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeTaskDefinition",
+        "ecs:RegisterTaskDefinition"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ECSServicePermissions",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeServices",
+        "ecs:UpdateService"
+      ],
+      "Resource": "arn:aws:ecs:*:*:service/technova-cluster/*"
+    },
+    {
+      "Sid": "ECSTagResource",
+      "Effect": "Allow",
+      "Action": "ecs:TagResource",
+      "Resource": "arn:aws:ecs:*:*:task-definition/technova-web:*",
+      "Condition": {
+        "StringEquals": {
+          "ecs:CreateAction": "RegisterTaskDefinition"
+        }
+      }
+    },
+    {
+      "Sid": "PassTaskExecutionRoleToEcs",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/ecsTaskExecutionRole",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": [
+            "ecs.amazonaws.com",
+            "ecs-tasks.amazonaws.com"
+          ]
+        }
+      }
+    }
+  ]
+}
